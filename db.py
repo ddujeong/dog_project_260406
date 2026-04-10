@@ -1,13 +1,20 @@
 import pandas as pd
 import pymysql
+from pymysql.cursors import DictCursor
 
 # 1. CSV 데이터 로드
 df = pd.read_csv('data/kaggle/dog_breeds.csv')
 
-# 2. MariaDB 연결
+# 2. MariaDB 연결 (수정 완료)
 conn = pymysql.connect(
-    host='localhost', user='root', password='1234', 
-    db='dog_nostic', charset='utf8mb4'
+    host='svc.sel3.cloudtype.app', 
+    user='root',             # [수정] root 대신 성공했던 유저명(mariadb) 사용
+    password='mnrllu2s8f57c00c', # [확인] 유저 패스워드가 맞는지 다시 확인!
+    db='dog_nostic', 
+    port=30775,                 # [추가] 이게 없으면 무조건 Timeout 납니다!
+    charset='utf8mb4',
+    cursorclass=DictCursor,
+    connect_timeout=10          # [추가] 연결 지연 대비
 )
 
 def calculate_scores(health_text):
@@ -40,13 +47,12 @@ def calculate_scores(health_text):
 
 try:
     with conn.cursor() as cursor:
-        
-        # [수정] special 컬럼을 추가하여 테이블 생성
+        # [수정] 테이블 생성 (varchar 길이는 여유 있게 조정)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS breed_full_data (
-                breed_name VARCHAR(50) PRIMARY KEY,
-                origin VARCHAR(50),
-                lifespan VARCHAR(20),
+                breed_name VARCHAR(100) PRIMARY KEY,
+                origin VARCHAR(100),
+                lifespan VARCHAR(50),
                 traits TEXT,
                 health_txt TEXT,
                 patella INT, hip INT, heart INT, skin INT, eye INT, special INT
@@ -54,11 +60,11 @@ try:
         """)
 
         for _, row in df.iterrows():
+            # CSV 컬럼명에 맞춰 b_name 추출 (Breed 컬럼이 있는지 확인하세요)
             b_name = str(row['Breed']).lower().replace(' ', '_')
             h_text = row['Common Health Problems']
             scores = calculate_scores(h_text)
             
-            # [수정] INSERT와 UPDATE 문에 special 컬럼 반영
             sql = """
                 INSERT INTO breed_full_data 
                 (breed_name, origin, lifespan, traits, health_txt, patella, hip, heart, skin, eye, special)
@@ -83,7 +89,10 @@ try:
             ))
             
     conn.commit()
-    print(f"✅ {len(df)}종의 데이터 현실 패치(심폐/특수질환 포함) 및 DB 갱신 완료!")
+    print(f"✅ {len(df)}종의 데이터 현실 패치 완료! (DduDdu 서비스에 반영 가능)")
+
+except Exception as e:
+    print(f"❌ 작업 중 에러 발생: {e}")
 
 finally:
     conn.close()
