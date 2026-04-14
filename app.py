@@ -5,6 +5,14 @@ import cv2
 import plotly.graph_objects as go
 from sklearn.preprocessing import normalize
 from tensorflow.keras.applications.efficientnet import preprocess_input
+from services.body_data_service import load_body_dataframe, map_images_to_dataframe
+from services.body_analysis_service import (
+    to_numeric_body_df,
+    add_body_features,
+    add_body_vectors,
+    add_body_type
+)
+from services.body_report_service import build_body_report_dict
 
 from services.breed_service import (
     get_models,
@@ -25,6 +33,19 @@ from services.abandoned_service import get_live_abandoned_data
 from services.recommendation_service import recommend_dogs
 
 model, feature_model = get_models()
+# --- Body 데이터 로드 ---
+@st.cache_data
+def load_body_data():
+    base_dir = "data/aihub_body/sample"
+
+    df = load_body_dataframe(base_dir)
+    df = map_images_to_dataframe(df, base_dir)
+    df = to_numeric_body_df(df)
+    df = add_body_features(df)
+    df = add_body_vectors(df)
+    df = add_body_type(df)
+
+    return df
 
 # --- 1. 페이지 설정 및 제목 ---
 st.set_page_config(page_title="Dog-nostic AI", page_icon="🐾", layout="centered")
@@ -95,65 +116,71 @@ if uploaded_file is not None:
                         st.write(f"• 집중 분석 부위: **{region_to_text(region)}**")
                         st.write(f"• {d_name1}의 골격 및 패턴을 중점적으로 분석했습니다.")
 
-        # [Tab 2: 건강 케어]
+        # [Tab 2: 체형 분석]
         with tab2:
-            alpha = 1.5
-            denom = (p1**alpha) + (p2**alpha)
-            w1, w2 = (p1**alpha) / denom, (p2**alpha) / denom
-            total_metrics = {"patella": 0, "hip": 0, "heart": 0, "skin": 0, "eye": 0, "special": 0}
-            
-            found_data = False
-            for b_name, weight in [(breed1, w1), (breed2, w2)]:
-                dog_data = get_dog_info(b_name)
-                if dog_data:
-                    found_data = True
-                    for key in total_metrics.keys():
-                        val = dog_data.get(key, 15)
-                        total_metrics[key] += float(val if val is not None else 15.0) * weight
+            st.subheader("🧬 체형 기반 분석 리포트")
 
-            if found_data:
-                col_chart, col_guide = st.columns([1, 1])
-                with col_chart:
-                    st.markdown("#### 📊 유전적 리스크 분포")
-                    categories = ["슬개골", "고관절", "심폐/호흡", "피부", "안구", "유전질환"]
-                    scores = [int(total_metrics[k]) for k in ["patella", "hip", "heart", "skin", "eye", "special"]]
-                    fig = go.Figure(go.Scatterpolar(
-                        r=scores+[scores[0]], 
-                        theta=categories+[categories[0]], 
-                        fill='toself', 
-                        line_color='#FF4B4B',
-                        text=scores+[scores[0]],           
-                        mode='markers+lines+text',         
-                        textposition="top center"        
-                    ))
-                    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=False)
-                    st.plotly_chart(fig, use_container_width=True)
+            df = load_body_data()
 
-                with col_guide:
-                    st.markdown("#### 💡 케어 가이드 & 영양소")
-                    all_notes, nutrients = set(), set()
-                    if total_metrics["heart"] >= 60:
-                        all_notes.add("🫁 **심폐/호흡기**: 리스크가 높으니 무더운 날 산책은 피해주세요.")
-                        nutrients.add("💊 **코엔자임 Q10**: 심장 기능 강화")
-                    if total_metrics["patella"] >= 60 or total_metrics["hip"] >= 60:
-                        all_notes.add("🦴 **관절 관리**: 미끄럼 방지 매트와 체중 관리가 필수입니다.")
-                        nutrients.add("💊 **글루코사민**: 관절 연골 보호")
-                    if total_metrics["eye"] >= 60:
-                        all_notes.add("👀 **안구 건강**: 정기적으로 눈 상태를 체크해주세요.")
-                        nutrients.add("💊 **루테인**: 안구 기능 유지")
-                    if total_metrics["skin"] >= 60:
-                        all_notes.add("🧴 **피부/알러지**: 보습과 사료 성분에 신경 써주세요.")
-                        nutrients.add("💊 **오메가-3**: 피부 염증 완화")
+            if df.empty:
+                st.error("체형 데이터 없음")
+                st.stop()
 
-                    with st.container(border=True):
-                        st.markdown("##### 🩺 필수 관리 포인트")
-                        for note in sorted(list(all_notes)): st.write(note)
-                        if nutrients:
-                            st.divider()
-                            st.markdown("##### 🥗 추천 영양 성분")
-                            for n in sorted(list(nutrients)): st.write(n)
-            else:
-                st.error("데이터베이스에 해당 견종의 건강 정보가 아직 없습니다.")
+            df = df[df["image_path"].notna()]
+
+            if df.empty:
+                st.error("이미지 매핑 실패")
+                st.stop()
+
+            # 샘플 선택
+            selected_idx = st.selectbox(
+                "샘플 선택",
+                df.index,
+                format_func=lambda i: f"{df.loc[i,'image_id']} | {df.loc[i,'breed']}"
+            )
+
+            row = df.loc[selected_idx]
+            report = build_body_report_dict(row)
+
+            col1, col2 = st.columns([1, 1])
+
+            # 이미지
+            with col1:
+                st.image(row["image_path"], caption=row["image_id"], width=300)
+
+            # 기본 정보
+            with col2:
+                st.markdown("### 기본 정보")
+                st.write(f"품종: {report['breed']}")
+                st.write(f"나이: {report['age']}")
+                st.write(f"성별: {report['sex']}")
+                st.write(f"체형: **{report['body_type']}**")
+
+            st.divider()
+
+            # physical 데이터
+            st.markdown("### 📊 체형 데이터")
+            st.write({
+                "weight": report["weight"],
+                "shoulder_height": report["shoulder_height"],
+                "neck_size": report["neck_size"],
+                "back_length": report["back_length"],
+                "chest_size": report["chest_size"],
+                "bcs": report["bcs"],
+            })
+
+            # 해석
+            st.markdown("### 🧠 체형 해석")
+            st.info(report["comment"])
+
+            # 파생 feature
+            st.markdown("### 📈 체형 비율 분석")
+            st.write({
+                "weight_height_ratio": row["weight_height_ratio"],
+                "chest_height_ratio": row["chest_height_ratio"],
+                "back_height_ratio": row["back_height_ratio"],
+                "neck_chest_ratio": row["neck_chest_ratio"],
+            })
 
         # [Tab 3: 유기견 매칭]
         with tab3:
