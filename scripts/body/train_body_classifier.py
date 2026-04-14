@@ -23,7 +23,7 @@ sys.path.append(PROJECT_ROOT)
 
 IMAGE_SIZE = (224, 224)
 BATCH_SIZE = 32
-EPOCHS = 10
+EPOCHS = 3
 SEED = 42
 
 CSV_PATH = os.path.join(PROJECT_ROOT, "data", "aihub_body", "body_dataset.csv")
@@ -65,8 +65,7 @@ def load_and_preprocess_image(image_path: str, label_idx: int):
     image = load_img(image_path, target_size=IMAGE_SIZE)
     image = img_to_array(image)
     image = preprocess_input(image)
-    label = tf.one_hot(label_idx, depth=len(LABEL_MAP))
-    return image, label
+    return image.astype("float32"), np.int32(label_idx)
 
 
 def make_dataset(df: pd.DataFrame, training: bool = True):
@@ -76,16 +75,16 @@ def make_dataset(df: pd.DataFrame, training: bool = True):
     ds = tf.data.Dataset.from_tensor_slices((image_paths, label_indices))
 
     def _map_fn(path, label):
-        image, one_hot = tf.numpy_function(
+        image, label_idx = tf.numpy_function(
             func=lambda p, l: load_and_preprocess_image(
                 p.decode("utf-8"), int(l)
             ),
             inp=[path, label],
-            Tout=[tf.float32, tf.float32]
+            Tout=[tf.float32, tf.int32]
         )
         image.set_shape((224, 224, 3))
-        one_hot.set_shape((len(LABEL_MAP),))
-        return image, one_hot
+        label_idx.set_shape(())
+        return image, label_idx
 
     ds = ds.map(_map_fn, num_parallel_calls=tf.data.AUTOTUNE)
 
@@ -113,7 +112,7 @@ def build_model():
 
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
-        loss="categorical_crossentropy",
+        loss="sparse_categorical_crossentropy",
         metrics=["accuracy"]
     )
 
@@ -196,7 +195,7 @@ def main():
         train_ds,
         validation_data=val_ds,
         epochs=EPOCHS,
-        class_weight=class_weight,
+        # class_weight=class_weight,
         callbacks=callbacks,
         verbose=1
     )
