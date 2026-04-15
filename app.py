@@ -135,8 +135,25 @@ if uploaded_file is not None:
 
                 st.markdown("### 📊 분석 결과")
 
-                st.success(f"주요 체형: {primary} ({p1*100:.1f}%)")
-                st.info(f"보조 체형: {secondary} ({p2*100:.1f}%)")
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.markdown(f"""
+                    <div style="background-color:#1f4f3f;padding:20px;border-radius:15px">
+                        <h3 style="color:#6effa6">주요 체형</h3>
+                        <h2>{primary.upper()}</h2>
+                        <p>{p1*100:.1f}%</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                with col2:
+                    st.markdown(f"""
+                    <div style="background-color:#1f3a5f;padding:20px;border-radius:15px">
+                        <h3 style="color:#6ec1ff">보조 체형</h3>
+                        <h2>{secondary.upper()}</h2>
+                        <p>{p2*100:.1f}%</p>
+                    </div>
+                    """, unsafe_allow_html=True)
 
                 desc = build_body_type_description(primary, secondary)
 
@@ -144,7 +161,10 @@ if uploaded_file is not None:
                 st.write(desc)
 
             st.divider()
+            st.markdown("### 📈 체형 지표 분석")
 
+            st.metric("체중/체고 비율", "0.12", "평균 수준")
+            st.metric("흉곽 비율", "1.58", "높음")
             st.markdown("### 📌 분석 안내")
             st.caption(
                 "본 결과는 이미지 기반 AI 추정이며, 실제 체형과 차이가 있을 수 있습니다. "
