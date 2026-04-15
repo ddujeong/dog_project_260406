@@ -14,6 +14,8 @@ from services.body_analysis_service import (
 )
 from services.body_model_service import predict_body_type
 from services.body_report_service import build_body_type_description
+from services.analysis_summary_service import build_analysis_summary
+from services.llm_report_service import generate_llm_body_report
 from services.breed_service import (
     get_models,
     classes,
@@ -76,7 +78,7 @@ if uploaded_file is not None:
     if top1_prob < 0.25:
         st.error("⚠️ 강아지 이미지가 아니거나 분석이 어려운 사진입니다.")
     else:
-        tab1, tab2, tab3 = st.tabs(["🔍 견종 분석 리포트", "🩺 맞춤 건강 케어", "🏠 닮은꼴 친구 찾기"])
+        tab1, tab2, tab3 = st.tabs(["🔍 견종 분석 리포트", "🧬 AI 체형 리포트", "🏠 닮은꼴 친구 찾기"])
 
         # [Tab 1: 견종 분석]
         with tab1:
@@ -117,7 +119,31 @@ if uploaded_file is not None:
                         st.write(f"• {d_name1}의 골격 및 패턴을 중점적으로 분석했습니다.")
         # [Tab 2: 체형 분석]
         with tab2:
-            st.subheader("🧬 체형 분석 리포트")
+            st.subheader("🧬 AI 체형 분석 리포트")
+
+            body_result = predict_body_type(image)
+
+            body_primary = body_result["primary"]
+            body_secondary = body_result["secondary"]
+            body_primary_prob = body_result["primary_prob"]
+            body_secondary_prob = body_result["secondary_prob"]
+
+            body_desc = build_body_type_description(body_primary, body_secondary)
+
+            summary = build_analysis_summary(
+                breed_primary=d_name1,
+                breed_secondary=d_name2,
+                breed_primary_prob=p1,
+                breed_secondary_prob=p2,
+                breed_confidence=get_confidence(p1, p2),
+                body_primary=body_primary,
+                body_secondary=body_secondary,
+                body_primary_prob=body_primary_prob,
+                body_secondary_prob=body_secondary_prob,
+                heatmap_region_text=region_to_text(region),
+            )
+
+            llm_report = generate_llm_body_report(summary)
 
             col1, col2 = st.columns([1, 1])
 
@@ -125,50 +151,48 @@ if uploaded_file is not None:
                 st.image(image, caption="입력 이미지", use_container_width=True)
 
             with col2:
-                result = predict_body_type(image)
+                st.markdown("### 📊 체형 분석 결과")
 
-                primary = result["primary"]
-                secondary = result["secondary"]
+                result_col1, result_col2 = st.columns(2)
 
-                p1 = result["primary_prob"]
-                p2 = result["secondary_prob"]
+                with result_col1:
+                    st.markdown(
+                        f"""
+                        <div style="background-color:#163b2e;padding:18px;border-radius:16px;">
+                            <div style="font-size:14px;color:#8df0b8;">주요 체형</div>
+                            <div style="font-size:28px;font-weight:700;color:white;">{body_primary}</div>
+                            <div style="font-size:18px;color:#d8ffe7;">{body_primary_prob * 100:.1f}%</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
-                st.markdown("### 📊 분석 결과")
+                with result_col2:
+                    st.markdown(
+                        f"""
+                        <div style="background-color:#1c3557;padding:18px;border-radius:16px;">
+                            <div style="font-size:14px;color:#91c9ff;">보조 체형</div>
+                            <div style="font-size:28px;font-weight:700;color:white;">{body_secondary}</div>
+                            <div style="font-size:18px;color:#dceeff;">{body_secondary_prob * 100:.1f}%</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
-                col1, col2 = st.columns(2)
+                st.markdown("### 🧠 규칙 기반 해석")
+                st.info(body_desc)
 
-                with col1:
-                    st.markdown(f"""
-                    <div style="background-color:#1f4f3f;padding:20px;border-radius:15px">
-                        <h3 style="color:#6effa6">주요 체형</h3>
-                        <h2>{primary.upper()}</h2>
-                        <p>{p1*100:.1f}%</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                with col2:
-                    st.markdown(f"""
-                    <div style="background-color:#1f3a5f;padding:20px;border-radius:15px">
-                        <h3 style="color:#6ec1ff">보조 체형</h3>
-                        <h2>{secondary.upper()}</h2>
-                        <p>{p2*100:.1f}%</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                desc = build_body_type_description(primary, secondary)
-
-                st.markdown("### 🧠 체형 해석")
-                st.write(desc)
+                st.markdown("### 👁️ AI가 주로 본 부위")
+                st.write(f"**{region_to_text(region)}** 중심으로 외형 특징을 분석했습니다.")
 
             st.divider()
-            st.markdown("### 📈 체형 지표 분석")
 
-            st.metric("체중/체고 비율", "0.12", "평균 수준")
-            st.metric("흉곽 비율", "1.58", "높음")
-            st.markdown("### 📌 분석 안내")
+            st.markdown("### 🤖 LLM 설명 리포트")
+            st.markdown(llm_report)
+
             st.caption(
-                "본 결과는 이미지 기반 AI 추정이며, 실제 체형과 차이가 있을 수 있습니다. "
-                "체형은 연속적인 특성을 가지므로 복합적인 특징이 함께 나타날 수 있습니다."
+                "본 리포트는 이미지 기반 AI 분석 결과를 바탕으로 생성된 참고용 설명입니다. "
+                "의학적 진단이나 전문 상담을 대체하지 않습니다."
             )
         # [Tab 3: 유기견 매칭]
         with tab3:

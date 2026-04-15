@@ -32,16 +32,15 @@ def build_body_comment(row: pd.Series) -> str:
     return " ".join(comments)
 def build_body_type_description(primary, secondary):
     desc_map = {
-        "slim": "마른 체형으로 체지방이 낮은 편입니다.",
-        "standard": "표준 체형으로 균형 잡힌 신체 비율을 보입니다.",
-        "broad": "흉곽이 발달된 체형으로 체폭이 넓은 편입니다.",
-        "overweight": "체지방이 많은 과체형 경향이 있습니다.",
+        "slim": "마른 체형으로 추정됩니다.",
+        "standard": "균형 잡힌 표준 체형으로 추정됩니다.",
+        "broad": "흉곽과 몸통 폭이 비교적 발달한 체형으로 추정됩니다.",
+        "overweight": "체지방이 많은 과체형 경향이 추정됩니다.",
     }
 
     primary_desc = desc_map.get(primary, "")
     secondary_desc = desc_map.get(secondary, "")
-
-    return f"{primary_desc} (보조 특징: {secondary_desc})"
+    return f"{primary_desc} 보조적으로는 {secondary_desc}"
 
 def build_body_report_dict(row: pd.Series) -> dict:
     return {
