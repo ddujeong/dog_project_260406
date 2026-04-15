@@ -8,3 +8,4 @@ scikit-learn
 pymysql
 plotly
 dotenv
+requests

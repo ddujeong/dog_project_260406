@@ -140,15 +140,15 @@ if uploaded_file is not None:
                 body_secondary=body_secondary,
                 body_primary_prob=body_primary_prob,
                 body_secondary_prob=body_secondary_prob,
-                heatmap_region_text=region_to_text(region),
+                heatmap_region_text=region_to_text(region),  # build_analysis_summary 내부에서 아직 필요하면 둬도 됨
             )
 
-            llm_report = generate_llm_body_report(summary)
+            llm_result = generate_llm_body_report(summary)
 
             col1, col2 = st.columns([1, 1])
 
             with col1:
-                st.image(image, caption="입력 이미지", use_container_width=True)
+                st.image(image, caption="입력 이미지", width="stretch")
 
             with col2:
                 st.markdown("### 📊 체형 분석 결과")
@@ -182,13 +182,23 @@ if uploaded_file is not None:
                 st.markdown("### 🧠 규칙 기반 해석")
                 st.info(body_desc)
 
-                st.markdown("### 👁️ AI가 주로 본 부위")
-                st.write(f"**{region_to_text(region)}** 중심으로 외형 특징을 분석했습니다.")
+                # 체형 리포트에서는 visual_focus/heatmap 부위 설명 제거
+                # st.markdown("### 👁️ AI가 주로 본 부위")
+                # st.write(f"**{region_to_text(region)}** 중심으로 외형 특징을 분석했습니다.")
 
             st.divider()
 
             st.markdown("### 🤖 LLM 설명 리포트")
-            st.markdown(llm_report)
+            st.markdown(llm_result["report"])
+
+            if llm_result["source"] == "main":
+                st.success(f"LLM 응답 경로: 메인 모델 ({llm_result['model']})")
+            elif llm_result["source"] == "fallback_model":
+                st.warning(f"LLM 응답 경로: fallback 모델 ({llm_result['model']})")
+            else:
+                st.error("LLM 응답 경로: 규칙 기반 fallback")
+                if llm_result["error"]:
+                    st.caption(f"오류 내용: {llm_result['error']}")
 
             st.caption(
                 "본 리포트는 이미지 기반 AI 분석 결과를 바탕으로 생성된 참고용 설명입니다. "
