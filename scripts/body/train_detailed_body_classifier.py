@@ -105,7 +105,7 @@ def build_model():
         metrics=["accuracy"]
     )
 
-    return model
+    return model,base
 
 
 def get_class_weight(df):
@@ -144,16 +144,42 @@ def main():
     train_ds = make_dataset(train_df)
     val_ds = make_dataset(val_df, training=False)
 
-    model = build_model()
+    model, base = build_model()
     class_weight = get_class_weight(train_df)
 
     print("\n=== Class Weight ===")
     print(class_weight)
 
+    print("\n=== Stage 1: classifier head 학습 ===")
     model.fit(
         train_ds,
         validation_data=val_ds,
-        epochs=EPOCHS,
+        epochs=8,
+        class_weight=class_weight,
+        verbose=1
+    )
+    print("\n=== Stage 2: fine-tuning ===")
+
+    base.trainable = True
+    for layer in base.layers[:-30]:
+        layer.trainable = False
+
+    for layer in base.layers[-30:]:
+        if isinstance(layer, tf.keras.layers.BatchNormalization):
+            layer.trainable = False
+        else:
+            layer.trainable = True
+
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(1e-5),
+        loss="sparse_categorical_crossentropy",
+        metrics=["accuracy"]
+    )
+
+    model.fit(
+        train_ds,
+        validation_data=val_ds,
+        epochs=3,
         class_weight=class_weight,
         verbose=1
     )
