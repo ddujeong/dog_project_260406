@@ -5,15 +5,15 @@ import cv2
 import plotly.graph_objects as go
 from sklearn.preprocessing import normalize
 from tensorflow.keras.applications.efficientnet import preprocess_input
-from services.body_data_service import load_body_dataframe, map_images_to_dataframe
+# from services.body_data_service import load_body_dataframe, map_images_to_dataframe
 from services.body_analysis_service import (
     to_numeric_body_df,
     add_body_features,
     add_body_vectors,
     add_body_type
 )
-from services.body_report_service import build_body_report_dict
-
+from services.body_model_service import predict_body_type
+from services.body_report_service import build_body_type_description
 from services.breed_service import (
     get_models,
     classes,
@@ -38,8 +38,8 @@ model, feature_model = get_models()
 def load_body_data():
     base_dir = "data/aihub_body/sample"
 
-    df = load_body_dataframe(base_dir)
-    df = map_images_to_dataframe(df, base_dir)
+    # df = load_body_dataframe(base_dir)
+    # df = map_images_to_dataframe(df, base_dir)
     df = to_numeric_body_df(df)
     df = add_body_features(df)
     df = add_body_vectors(df)
@@ -115,73 +115,41 @@ if uploaded_file is not None:
                         st.markdown("### 🧬 외형 특징 요약")
                         st.write(f"• 집중 분석 부위: **{region_to_text(region)}**")
                         st.write(f"• {d_name1}의 골격 및 패턴을 중점적으로 분석했습니다.")
-
         # [Tab 2: 체형 분석]
         with tab2:
-            st.subheader("🧬 체형 기반 분석 리포트")
-
-            df = load_body_data()
-
-            if df.empty:
-                st.error("체형 데이터 없음")
-                st.stop()
-
-            df = df[df["image_path"].notna()]
-
-            if df.empty:
-                st.error("이미지 매핑 실패")
-                st.stop()
-
-            # 샘플 선택
-            selected_idx = st.selectbox(
-                "샘플 선택",
-                df.index,
-                format_func=lambda i: f"{df.loc[i,'image_id']} | {df.loc[i,'breed']}"
-            )
-
-            row = df.loc[selected_idx]
-            report = build_body_report_dict(row)
+            st.subheader("🧬 체형 분석 리포트")
 
             col1, col2 = st.columns([1, 1])
 
-            # 이미지
             with col1:
-                st.image(row["image_path"], caption=row["image_id"], width=300)
+                st.image(image, caption="입력 이미지", use_container_width=True)
 
-            # 기본 정보
             with col2:
-                st.markdown("### 기본 정보")
-                st.write(f"품종: {report['breed']}")
-                st.write(f"나이: {report['age']}")
-                st.write(f"성별: {report['sex']}")
-                st.write(f"체형: **{report['body_type']}**")
+                result = predict_body_type(image)
+
+                primary = result["primary"]
+                secondary = result["secondary"]
+
+                p1 = result["primary_prob"]
+                p2 = result["secondary_prob"]
+
+                st.markdown("### 📊 분석 결과")
+
+                st.success(f"주요 체형: {primary} ({p1*100:.1f}%)")
+                st.info(f"보조 체형: {secondary} ({p2*100:.1f}%)")
+
+                desc = build_body_type_description(primary, secondary)
+
+                st.markdown("### 🧠 체형 해석")
+                st.write(desc)
 
             st.divider()
 
-            # physical 데이터
-            st.markdown("### 📊 체형 데이터")
-            st.write({
-                "weight": report["weight"],
-                "shoulder_height": report["shoulder_height"],
-                "neck_size": report["neck_size"],
-                "back_length": report["back_length"],
-                "chest_size": report["chest_size"],
-                "bcs": report["bcs"],
-            })
-
-            # 해석
-            st.markdown("### 🧠 체형 해석")
-            st.info(report["comment"])
-
-            # 파생 feature
-            st.markdown("### 📈 체형 비율 분석")
-            st.write({
-                "weight_height_ratio": row["weight_height_ratio"],
-                "chest_height_ratio": row["chest_height_ratio"],
-                "back_height_ratio": row["back_height_ratio"],
-                "neck_chest_ratio": row["neck_chest_ratio"],
-            })
-
+            st.markdown("### 📌 분석 안내")
+            st.caption(
+                "본 결과는 이미지 기반 AI 추정이며, 실제 체형과 차이가 있을 수 있습니다. "
+                "체형은 연속적인 특성을 가지므로 복합적인 특징이 함께 나타날 수 있습니다."
+            )
         # [Tab 3: 유기견 매칭]
         with tab3:
             st.subheader(f"🏠 {d_name1} 닮은꼴 친구 찾기")
