@@ -132,7 +132,7 @@ def generate_chatbot_answer(user_input, contexts):
         answer = ask_gemini(prompt)  # ask_ollama -> ask_gemini
         return {
             "answer": answer,
-            "source": "Gemini-1.5-Flash",
+            "source": "Gemini-2.5-Flash",
             "error": None
         }
     except Exception as e:
