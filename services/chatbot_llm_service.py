@@ -90,49 +90,70 @@ def build_fallback_prompt(user_input):
     return prompt.strip()
 
 
-def ask_ollama(prompt, model="gemma4:e2b"):
-    url = "http://localhost:11434/api/generate"
-    payload = {
-        "model": model,
-        "prompt": prompt,
-        "stream": False
-    }
+import google.generativeai as genai
+import streamlit as st
 
-    resp = requests.post(url, json=payload, timeout=120)
-    resp.raise_for_status()
-    data = resp.json()
-    return data["response"]
+# 프롬프트 빌더 함수들은 그대로 유지 (동일하게 사용 가능)
+def build_chatbot_prompt(user_input, contexts):
+    # ... (기존 코드와 동일) ...
+    return prompt.strip()
 
+def build_fallback_prompt(user_input):
+    # ... (기존 코드와 동일) ...
+    return prompt.strip()
 
+# --- 핵심: Gemini 호출 함수 ---
+def ask_gemini(prompt):
+    """
+    Ollama 대신 Gemini API를 호출합니다.
+    Streamlit Secrets에서 GEMINI_API_KEY를 가져와야 합니다.
+    """
+    try:
+        # API 키 설정
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        
+        # 답변 생성
+        response = model.generate_content(prompt)
+        
+        if response and response.text:
+            return response.text
+        else:
+            return "답변을 생성할 수 없습니다. 다시 시도해 주세요."
+            
+    except Exception as e:
+        raise Exception(f"Gemini API 호출 중 에러 발생: {str(e)}")
+
+# --- 서비스 인터페이스 함수 ---
 def generate_chatbot_answer(user_input, contexts):
     try:
         prompt = build_chatbot_prompt(user_input, contexts)
-        answer = ask_ollama(prompt)
+        answer = ask_gemini(prompt)  # ask_ollama -> ask_gemini
         return {
             "answer": answer,
-            "source": "context",
+            "source": "Gemini-1.5-Flash",
             "error": None
         }
     except Exception as e:
         return {
-            "answer": "답변 생성 중 오류가 발생했습니다.",
+            "answer": "챗봇 답변 생성 중 오류가 발생했습니다.",
             "source": "context_error",
             "error": str(e)
         }
 
-
 def generate_fallback_answer(user_input):
     try:
         prompt = build_fallback_prompt(user_input)
-        answer = ask_ollama(prompt)
+        answer = ask_gemini(prompt)  # ask_ollama -> ask_gemini
         return {
             "answer": answer,
-            "source": "fallback",
+            "source": "fallback-Gemini",
             "error": None
         }
     except Exception as e:
         return {
-            "answer": "답변 생성 중 오류가 발생했습니다.",
+            "answer": "일반 상식 답변 생성 중 오류가 발생했습니다.",
             "source": "fallback_error",
             "error": str(e)
         }

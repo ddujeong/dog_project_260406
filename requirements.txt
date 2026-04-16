@@ -14,3 +14,4 @@ torch
 transformers
 torchvision
 scikit-learn
+google-generativeai
