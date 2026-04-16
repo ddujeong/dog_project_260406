@@ -4,13 +4,22 @@ from services.chatbot_llm_service import (
     generate_chatbot_answer,
     generate_fallback_answer,
 )
-
+import os
 
 class ChatbotService:
     def __init__(self):
-        self.retriever = UnifiedRetriever(
-            "data/aihub_chat/processed/merged_dataset.json"
-        )
+        # 1. 파일 위치를 기준으로 절대 경로 생성
+        # 현재 파일(chatbot_service.py)의 상위 폴더(services/)의 상위 폴더(root/)를 찾음
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = os.path.dirname(current_dir) 
+        
+        # 2. 유동적인 경로 설정
+        data_path = os.path.join(base_dir, "data", "aihub_chat", "processed", "merged_dataset.json")
+        
+        # 디버깅용 (에러 발생 시 로그에서 확인 가능)
+        print(f"DEBUG: Trying to load chatbot data from: {data_path}")
+        
+        self.retriever = UnifiedRetriever(data_path)
         self.reranker = SemanticReranker()
         self.reranker.build_index(self.retriever.data)
 
