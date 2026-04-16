@@ -254,7 +254,7 @@ def call_gemini_report(summary: dict) -> dict:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
         
         # 2. 모델 설정 (안정적인 1.5 Flash 추천)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         # 3. 프롬프트 생성
         prompt = build_body_report_prompt(summary)
@@ -272,7 +272,7 @@ def call_gemini_report(summary: dict) -> dict:
             return {
                 "report": text,
                 "source": "Gemini-Main",
-                "model": "gemini-1.5-flash",
+                "model": "gemini-2.5-flash",
                 "error": None
             }
         else:
