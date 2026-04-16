@@ -1,4 +1,6 @@
 import requests
+import google.generativeai as genai
+import streamlit as st
 
 
 def build_chatbot_prompt(user_input, contexts):
@@ -87,19 +89,6 @@ def build_fallback_prompt(user_input):
 
 이제 위 규칙을 기반으로 현재 상황에 맞는 현실적인 답변을 작성해라.
 """
-    return prompt.strip()
-
-
-import google.generativeai as genai
-import streamlit as st
-
-# 프롬프트 빌더 함수들은 그대로 유지 (동일하게 사용 가능)
-def build_chatbot_prompt(user_input, contexts):
-    # ... (기존 코드와 동일) ...
-    return prompt.strip()
-
-def build_fallback_prompt(user_input):
-    # ... (기존 코드와 동일) ...
     return prompt.strip()
 
 # --- 핵심: Gemini 호출 함수 ---

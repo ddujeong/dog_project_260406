@@ -1,7 +1,9 @@
 import json
 import os
 import requests
-
+import json
+import google.generativeai as genai
+import streamlit as st
 
 BODY_LABEL_KO = {
     "slim": "마른형",
@@ -245,76 +247,47 @@ def is_incomplete_report(text: str) -> bool:
     missing_count = sum(1 for section in required_sections if section not in text)
     return missing_count >= 1
 
-def _request_ollama(prompt: str, model_name: str) -> str:
-    url = f"{OLLAMA_HOST}/api/generate"
-    payload = {
-        "model": model_name,
-        "prompt": prompt,
-        "stream": False,
-        "options": {
-            "temperature": 0.3,
-            "num_predict": 900,
-        }
-    }
-
-    response = requests.post(url, json=payload, timeout=OLLAMA_TIMEOUT)
-    response.raise_for_status()
-
-    data = response.json()
-    print("[OLLAMA RAW RESPONSE]", data)
-
-    text = data.get("response", "").strip()
-
-    if not text:
-        raise ValueError("Ollama 응답이 비어 있습니다.")
-
-    if is_incomplete_report(text):
-        raise ValueError("불완전한 LLM 응답입니다.")
-
-    return text
-
-
-def call_real_llm(summary: dict) -> dict:
-    ok, err = is_ollama_available()
-    if not ok:
+def call_gemini_report(summary: dict) -> dict:
+    """Ollama 대신 Gemini API를 사용하여 리포트를 생성합니다."""
+    try:
+        # 1. API 키 설정 (Streamlit Secrets 필수)
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        
+        # 2. 모델 설정 (안정적인 1.5 Flash 추천)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # 3. 프롬프트 생성
+        prompt = build_body_report_prompt(summary)
+        
+        # 4. 답변 생성
+        response = model.generate_content(prompt)
+        
+        if response and response.text:
+            text = response.text.strip()
+            
+            # 응답 완성도 체크
+            if is_incomplete_report(text):
+                raise ValueError("불완전한 Gemini 응답")
+                
+            return {
+                "report": text,
+                "source": "Gemini-Main",
+                "model": "gemini-1.5-flash",
+                "error": None
+            }
+        else:
+            raise ValueError("응답 비어있음")
+            
+    except Exception as e:
+        print(f"[ERROR] Gemini Report 실패: {e}")
         return {
             "report": build_fallback_report(summary),
             "source": "rule_based_fallback",
             "model": None,
-            "error": f"Ollama 서버 연결 실패: {err}"
+            "error": str(e)
         }
-
-    prompt = build_body_report_prompt(summary)
-
-    try:
-        text = _request_ollama(prompt, OLLAMA_MODEL)
-        return {
-            "report": text,
-            "source": "main",
-            "model": OLLAMA_MODEL,
-            "error": None
-        }
-    except Exception as e1:
-        print(f"[WARN] 메인 Ollama 호출 실패: {e1}")
-
-    try:
-        text = _request_ollama(prompt, OLLAMA_FALLBACK_MODEL)
-        return {
-            "report": text,
-            "source": "fallback_model",
-            "model": OLLAMA_FALLBACK_MODEL,
-            "error": None
-        }
-    except Exception as e2:
-        print(f"[WARN] fallback Ollama 호출 실패: {e2}")
-        return {
-            "report": build_fallback_report(summary),
-            "source": "rule_based_fallback",
-            "model": None,
-            "error": str(e2)
-        }
-
 
 def generate_llm_body_report(summary: dict) -> dict:
+    """Tab 2에서 호출하는 최종 인터페이스"""
     processed_summary = preprocess_summary_for_body_llm(summary)
-    return call_real_llm(processed_summary)
+    return call_gemini_report(processed_summary)
