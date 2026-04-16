@@ -8,21 +8,29 @@ import os
 
 class ChatbotService:
     def __init__(self):
-        # 현재 파일의 절대 경로를 기준으로 루트 디렉토리를 찾습니다.
-        current_file_path = os.path.abspath(__file__) # services/chatbot_service.py
-        services_dir = os.path.dirname(current_file_path) # services/
-        base_dir = os.path.dirname(services_dir) # 프로젝트 root/
+        # 1. 절대 경로 기준점 잡기
+        current_file_path = os.path.abspath(__file__) 
+        services_dir = os.path.dirname(current_file_path) 
+        base_dir = os.path.dirname(services_dir) 
 
-        # 아래와 같이 절대 경로를 완성합니다.
+        # 2. 데이터셋 경로와 임베딩 경로 각각 설정
         data_path = os.path.join(base_dir, "data", "aihub_chat", "processed", "merged_dataset.json")
+        # [수정 포인트] 임베딩 파일 경로 추가
+        emb_path = os.path.join(base_dir, "data", "aihub_chat", "processed", "embeddings.npy")
         
-        # [중요] 파일이 정말 있는지 확인하는 로직 추가
+        # 파일 체크
         if not os.path.exists(data_path):
-            # 만약 못 찾는다면 현재 위치에서 가능한 모든 경로를 디버깅용으로 출력
-            raise FileNotFoundError(f"실제 경로에 파일이 없습니다: {data_path}")
+            raise FileNotFoundError(f"데이터셋이 없습니다: {data_path}")
+        if not os.path.exists(emb_path):
+            print(f"⚠️ 임베딩 파일이 경로에 없습니다: {emb_path}")
 
+        # 3. 리트리버 초기화
         self.retriever = UnifiedRetriever(data_path)
-        self.reranker = SemanticReranker()
+        
+        # 4. [가장 중요] 리랭커 생성 시 emb_path를 꼭 전달하세요!
+        self.reranker = SemanticReranker(embedding_path=emb_path)
+        
+        # 5. 인덱스 빌드 (이제 reranker 내부에 이미 로드된 임베딩이 있으므로 실시간 생성을 건너뜁니다)
         self.reranker.build_index(self.retriever.data)
 
     def get_context(self, user_input, top_k=5):
