@@ -10,12 +10,18 @@ class SemanticReranker:
         self.doc_embeddings = None
         self.doc_texts = None
         
-        # 앱 시작 시 임베딩을 로드하도록 설정
-        if embedding_path and os.path.exists(embedding_path):
-            self.doc_embeddings = np.load(embedding_path)
-            print(f"✅ 임베딩 로드 완료! (Shape: {self.doc_embeddings.shape})")
-        else:
-            print("⚠️ 임베딩 파일이 없습니다. 나중에 build_index를 호출해야 합니다.")
+        # 1. 절대 경로로 강제 변환
+        if embedding_path:
+            # 상대 경로로 들어왔을 경우를 대비해 절대 경로로 뽑아봅니다.
+            abs_emb_path = os.path.abspath(embedding_path)
+            print(f"🔎 [Path Check] 찾는 위치: {abs_emb_path}")
+            
+            if os.path.exists(abs_emb_path):
+                self.doc_embeddings = np.load(abs_emb_path)
+                print(f"✅ [Success] 임베딩 로드 완료! (Shape: {self.doc_embeddings.shape})")
+            else:
+                print(f"❌ [Fail] 파일이 없습니다. 현재 서버 폴더 목록: {os.listdir(os.path.dirname(abs_emb_path) if os.path.exists(os.path.dirname(abs_emb_path)) else '.')}")
+                print(f"⚠️ 임베딩 파일이 없습니다. 나중에 build_index를 호출해야 합니다.")
 
     def build_index(self, docs):
         self.doc_texts = [d["content"] for d in docs]
