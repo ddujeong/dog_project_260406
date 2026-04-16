@@ -9,3 +9,4 @@ pymysql
 plotly
 dotenv
 requests
+sentence-transformers

@@ -33,7 +33,7 @@ from services.gradcam_service import (
 from services.health_service import get_dog_info
 from services.abandoned_service import get_live_abandoned_data
 from services.recommendation_service import recommend_dogs
-
+from services.chatbot_service import ChatbotService
 model, feature_model = get_models()
 # --- Body 데이터 로드 ---
 @st.cache_data
@@ -48,7 +48,9 @@ def load_body_data():
     df = add_body_type(df)
 
     return df
-
+@st.cache_resource
+def get_chatbot():
+    return ChatbotService()
 # --- 1. 페이지 설정 및 제목 ---
 st.set_page_config(page_title="Dog-nostic AI", page_icon="🐾", layout="centered")
 st.title("🐾 Dog-nostic: 견종 분석 & 건강 리포트")
@@ -60,6 +62,13 @@ with st.sidebar:
     uploaded_file = st.file_uploader("강아지 사진을 선택하세요...", type=["jpg", "jpeg", "png"])
     st.divider()
     st.info("AI 분석을 통해 견종 확인부터 건강 가이드, 유기견 매칭까지 한 번에 확인하세요!")
+
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🔍 견종 분석 리포트",
+    "🧬 AI 체형 리포트",
+    "🏠 닮은꼴 친구 찾기",
+    "💬 건강 Q&A 챗봇"
+])
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
@@ -78,8 +87,6 @@ if uploaded_file is not None:
     if top1_prob < 0.25:
         st.error("⚠️ 강아지 이미지가 아니거나 분석이 어려운 사진입니다.")
     else:
-        tab1, tab2, tab3 = st.tabs(["🔍 견종 분석 리포트", "🧬 AI 체형 리포트", "🏠 닮은꼴 친구 찾기"])
-
         # [Tab 1: 견종 분석]
         with tab1:
             col_img, col_res = st.columns([1, 1.2])
@@ -255,6 +262,35 @@ if uploaded_file is not None:
                         st.info("비슷한 외형의 친구를 찾지 못했습니다.")
             else:
                 st.warning("보호소 데이터를 가져올 수 없습니다.")
+# [Tab 4: 건강 Q&A 챗봇]
+with tab4:
+    st.subheader("🐶 반려견 건강 챗봇")
 
+    chatbot = get_chatbot()
+
+    user_input = st.text_input("궁금한 건강 관련 질문을 입력하세요:")
+
+    if st.button("질문하기", key="ask_chatbot"):
+        if user_input.strip():
+            result = chatbot.answer(user_input)
+
+            st.markdown("### 🤖 답변")
+            st.write(result["answer"])
+
+            if result["source"] == "fallback" and result["error"]:
+                st.caption(f"LLM 오류: {result['error']}")
+
+            with st.expander("📌 검색된 근거 보기"):
+                for i, r in enumerate(result["contexts"], start=1):
+                    st.markdown(
+                        f"**{i}. [{r['source_type']}] score={r.get('final_score', r['score']):.3f}**"
+                    )
+                    if r["question"]:
+                        st.write(f"Q: {r['question']}")
+                    st.write(r["content"])
+                    st.write("---")
+        else:
+            st.warning("질문을 입력해 주세요.")
+            
     st.divider()
     st.caption("제공되는 정보는 AI 분석 결과이며, 정확한 상태 확인은 전문가와 상담하시기 바랍니다.")
