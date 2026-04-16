@@ -93,27 +93,31 @@ def build_fallback_prompt(user_input):
 
 # --- 핵심: Gemini 호출 함수 ---
 def ask_gemini(prompt):
-    """
-    Ollama 대신 Gemini API를 호출합니다.
-    Streamlit Secrets에서 GEMINI_API_KEY를 가져와야 합니다.
-    """
     try:
-        # API 키 설정
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        # API 키 설정 확인 (키가 비어있는지 체크)
+        api_key = st.secrets.get("GEMINI_API_KEY")
+        if not api_key:
+            raise Exception("GEMINI_API_KEY가 Secrets에 없습니다.")
+            
+        genai.configure(api_key=api_key)
         
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        # 모델 식별자를 명확히 'models/' 접두사와 함께 써보세요.
+        model = genai.GenerativeModel('models/gemini-2.5-flash')
         
-        # 답변 생성
         response = model.generate_content(prompt)
         
+        # Safety 필터에 의해 답변이 차단되었는지 확인
+        if response.candidates and response.candidates[0].finish_reason == 3:
+            return "내용이 부적절하여 답변이 차단되었습니다."
+
         if response and response.text:
             return response.text
-        else:
-            return "답변을 생성할 수 없습니다. 다시 시도해 주세요."
+        return "답변 생성 실패"
             
     except Exception as e:
-        raise Exception(f"Gemini API 호출 중 에러 발생: {str(e)}")
-
+        # 이 에러가 Streamlit 로그(Manage app -> Logs)에 정확히 찍힙니다.
+        print(f"🔥 GEMINI API CRITICAL ERROR: {str(e)}")
+        raise e
 # --- 서비스 인터페이스 함수 ---
 def generate_chatbot_answer(user_input, contexts):
     try:
