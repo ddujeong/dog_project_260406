@@ -32,7 +32,7 @@ from services.gradcam_service import (
 )
 from services.health_service import get_dog_info
 from services.abandoned_service import get_live_abandoned_data
-from services.recommendation_service import recommend_dogs
+from services.recommendation_service import get_cached_recommendations
 from services.chatbot_service import ChatbotService
 model, feature_model = get_models()
 # --- Body 데이터 로드 ---
@@ -229,15 +229,7 @@ if uploaded_file is not None:
                     my_bar = st.progress(0)
                     # sample_items = random.sample(live_items, min(50, len(live_items)))
                     # top_recommendations = recommend_dogs(sample_items, target_idx, model)
-                    top_recommendations = recommend_dogs(
-                        live_items, 
-                        target_idx, 
-                        model, 
-                        feature_model, 
-                        user_feature, 
-                        my_bar, 
-                        status_text
-                    )
+                    top_recommendations = get_cached_recommendations(live_items, user_feature, feature_model)
                     my_bar.progress(100) 
                     my_bar.empty() # 완료 후 제거
                     if top_recommendations:
