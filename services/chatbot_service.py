@@ -8,17 +8,19 @@ import os
 
 class ChatbotService:
     def __init__(self):
-        # 1. 파일 위치를 기준으로 절대 경로 생성
-        # 현재 파일(chatbot_service.py)의 상위 폴더(services/)의 상위 폴더(root/)를 찾음
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        base_dir = os.path.dirname(current_dir) 
-        
-        # 2. 유동적인 경로 설정
+        # 현재 파일의 절대 경로를 기준으로 루트 디렉토리를 찾습니다.
+        current_file_path = os.path.abspath(__file__) # services/chatbot_service.py
+        services_dir = os.path.dirname(current_file_path) # services/
+        base_dir = os.path.dirname(services_dir) # 프로젝트 root/
+
+        # 아래와 같이 절대 경로를 완성합니다.
         data_path = os.path.join(base_dir, "data", "aihub_chat", "processed", "merged_dataset.json")
         
-        # 디버깅용 (에러 발생 시 로그에서 확인 가능)
-        print(f"DEBUG: Trying to load chatbot data from: {data_path}")
-        
+        # [중요] 파일이 정말 있는지 확인하는 로직 추가
+        if not os.path.exists(data_path):
+            # 만약 못 찾는다면 현재 위치에서 가능한 모든 경로를 디버깅용으로 출력
+            raise FileNotFoundError(f"실제 경로에 파일이 없습니다: {data_path}")
+
         self.retriever = UnifiedRetriever(data_path)
         self.reranker = SemanticReranker()
         self.reranker.build_index(self.retriever.data)

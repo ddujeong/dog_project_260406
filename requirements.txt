@@ -10,3 +10,7 @@ plotly
 dotenv
 requests
 sentence-transformers
+torch
+transformers
+torchvision
+scikit-learn
