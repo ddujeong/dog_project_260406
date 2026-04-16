@@ -4,25 +4,26 @@ import numpy as np
 
 
 class SemanticReranker:
-    def __init__(self, model_name="all-MiniLM-L6-v2"):
+    def __init__(self, model_name="all-MiniLM-L6-v2", embedding_path=None):
         self.model = SentenceTransformer(model_name)
         self.doc_embeddings = None
         self.doc_texts = None
+        
+        # 앱 시작 시 임베딩을 로드하도록 설정
+        if embedding_path and os.path.exists(embedding_path):
+            self.doc_embeddings = np.load(embedding_path)
+            print(f"✅ 임베딩 로드 완료! (Shape: {self.doc_embeddings.shape})")
+        else:
+            print("⚠️ 임베딩 파일이 없습니다. 나중에 build_index를 호출해야 합니다.")
 
-    # 🔥 전체 문서 embedding 1회 생성
     def build_index(self, docs):
         self.doc_texts = [d["content"] for d in docs]
-
-        self.doc_embeddings = self.model.encode(
-            self.doc_texts,
-            batch_size=32,
-            show_progress_bar=True
-        )
-
-        # 🔥 content → index 매핑
-        self.text_to_idx = {
-            text: i for i, text in enumerate(self.doc_texts)
-        }
+        self.text_to_idx = {text: i for i, text in enumerate(self.doc_texts)}
+        
+        # 만약 초기화 시 로드하지 못했다면 여기서 계산 (서버에선 피해야 함)
+        if self.doc_embeddings is None:
+            print("🚀 실시간 임베딩 생성 중...")
+            self.doc_embeddings = self.model.encode(self.doc_texts, batch_size=32, show_progress_bar=True)
 
     # 🔥 query만 매번 계산
     def rerank(self, query, docs, top_k=5):
