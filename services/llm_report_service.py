@@ -250,11 +250,13 @@ def is_incomplete_report(text: str) -> bool:
 def call_gemini_report(summary: dict) -> dict:
     """Ollama 대신 Gemini API를 사용하여 리포트를 생성합니다."""
     try:
-        # 1. API 키 설정 (Streamlit Secrets 필수)
+        # 1. API 키 설정
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
         
-        # 2. 모델 설정 (안정적인 1.5 Flash 추천)
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        # 2. 모델 설정 (접두사 'models/' 추가)
+        # 챗봇에서 성공한 형식이 'gemini-2.5-flash'라면 그대로 두셔도 되지만,
+        # 에러가 난다면 'models/gemini-2.5-flash'로 명시하는 것이 가장 확실합니다.
+        model = genai.GenerativeModel('models/gemini-2.5-flash')
         
         # 3. 프롬프트 생성
         prompt = build_body_report_prompt(summary)
@@ -265,7 +267,7 @@ def call_gemini_report(summary: dict) -> dict:
         if response and response.text:
             text = response.text.strip()
             
-            # 응답 완성도 체크
+            # 응답 완성도 체크 (필수 섹션이 누락되면 에러를 발생시켜 fallback으로 보냄)
             if is_incomplete_report(text):
                 raise ValueError("불완전한 Gemini 응답")
                 
@@ -279,7 +281,9 @@ def call_gemini_report(summary: dict) -> dict:
             raise ValueError("응답 비어있음")
             
     except Exception as e:
-        print(f"[ERROR] Gemini Report 실패: {e}")
+        # 💡 중요: 여기서 찍히는 에러 로그를 Streamlit Cloud 로그에서 확인해 보세요.
+        # 만약 "404 Model not found"가 뜬다면 모델 ID 문제입니다.
+        print(f"[ERROR] Gemini Report 실패 사유: {e}")
         return {
             "report": build_fallback_report(summary),
             "source": "rule_based_fallback",
