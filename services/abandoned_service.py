@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta
-
+import streamlit as st
 import dotenv
 import requests
 
@@ -10,7 +10,7 @@ dotenv.load_dotenv()
 def get_live_abandoned_data(target_breed_name):
     url = "http://apis.data.go.kr/1543061/abandonmentPublicService_v2/abandonmentPublic_v2"
 
-    service_key = os.getenv("API_KEY")
+    service_key = st.secrets.get("API_KEY")
     today = datetime.now()
     start_day = (today - timedelta(days=90)).strftime('%Y%m%d')
     today_str = today.strftime('%Y%m%d')
@@ -27,10 +27,14 @@ def get_live_abandoned_data(target_breed_name):
     }
 
     try:
+        print("API_KEY:", service_key)
         response = requests.get(url, params=params, timeout=10)
+        print("status:", response.status_code)
         if response.status_code == 200:
             data = response.json()
             body = data.get('response', {}).get('body', {})
+            print("items raw:", body.get('items'))
+
             items_dict = body.get('items', {})
 
             if items_dict and 'item' in items_dict:
@@ -60,9 +64,9 @@ def get_live_abandoned_data(target_breed_name):
                         continue
 
                     filtered_dogs.append(dog)
-
+                print("filtered_dogs count:", len(filtered_dogs))
                 return filtered_dogs
-
+    
     except Exception as e:
         print(f"API 호출 중 오류 발생: {e}")
 
