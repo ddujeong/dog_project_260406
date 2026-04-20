@@ -22,7 +22,7 @@ def extract_feature_vector(img_url, model):
         return normalize([vec_flattened])[0]
     except:
         return None
-@st.cache_data(show_spinner=False)
+# @st.cache_data(show_spinner=False)
 def get_cached_recommendations(items, user_feature, _feature_model):
     recommendations = []
 
