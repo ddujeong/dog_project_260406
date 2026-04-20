@@ -24,32 +24,48 @@ def extract_feature_vector(img_url, model):
         return None
 @st.cache_data(show_spinner=False)
 def get_cached_recommendations(items, user_feature, _feature_model):
-    """
-    UI 관련 인자(progress_bar 등)를 모두 제거하여 
-    값(items, feature)이 같으면 즉시 결과를 반환하도록 함.
-    앞에 '_'가 붙은 _feature_model은 캐시 체크 대상에서 제외됨.
-    """
     recommendations = []
+
+    print("items count:", len(items))
+    print("user_feature is None:", user_feature is None)
+    print("user_feature shape:", None if user_feature is None else user_feature.shape)
+    print("feature_model output shape:", getattr(_feature_model, "output_shape", None))
+
+    if user_feature is None:
+        return []
+
     u_feat = user_feature.reshape(1, -1)
-    
-    for item in items:
+
+    for idx, item in enumerate(items):
         try:
-            res = requests.get(item['popfile1'], timeout=3)
+            print(f"[{idx}] url:", item.get("popfile1"))
+
+            res = requests.get(item['popfile1'], timeout=5)
+            res.raise_for_status()
+
             img = Image.open(io.BytesIO(res.content)).convert('RGB').resize((224, 224))
             img_arr = np.expand_dims(np.array(img).astype('float32'), axis=0)
-            processed_img = preprocess_input(img_arr) 
-            
-            # 특징 추출
+            processed_img = preprocess_input(img_arr)
+
             dog_features = _feature_model.predict(processed_img, verbose=0)[0]
-            d_feat = dog_features.flatten().reshape(1, -1)
-            
+            d_feat = normalize([dog_features.flatten()])[0].reshape(1, -1)
+
+            print("u_feat shape:", u_feat.shape, "d_feat shape:", d_feat.shape)
+
             sim_val = cosine_similarity(u_feat, d_feat)[0][0]
             similarity = float(sim_val * 100)
-            
-            if similarity > 10: 
+
+            print("similarity:", similarity)
+
+            if similarity > 0:
                 recommendations.append({"item": item, "similarity": similarity})
-        except:
+
+        except Exception as e:
+            print("recommendation error:", item.get("popfile1"), e)
             continue
-            
+
     recommendations.sort(key=lambda x: x['similarity'], reverse=True)
-    return recommendations[:5]   
+    print("final recommendation count:", len(recommendations))
+    print("top similarities:", [r["similarity"] for r in recommendations[:5]])
+
+    return recommendations[:5]
